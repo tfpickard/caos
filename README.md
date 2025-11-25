@@ -1,5 +1,8 @@
 # CAOS - Chaotic Algorithms Operating Service
 
+[![Vercel Production](https://github.com/tfpickard/caos/actions/workflows/vercel-production.yml/badge.svg)](https://github.com/tfpickard/caos/actions/workflows/vercel-production.yml)
+[![Vercel Preview](https://github.com/tfpickard/caos/actions/workflows/vercel-preview.yml/badge.svg)](https://github.com/tfpickard/caos/actions/workflows/vercel-preview.yml)
+
 > **C**haotic **A**lgorithms **O**perating **S**ervice
 
 A beautiful, feature-rich chaos-as-a-service platform offering deterministic chaotic systems through a clean API and interactive visualizations.
