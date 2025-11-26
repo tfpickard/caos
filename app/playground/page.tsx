@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
-type System = 'lorenz' | 'logistic-map' | 'double-pendulum' | 'three-body' | 'mandelbrot' | 'cellular-automata';
+type System = 'lorenz' | 'logistic-map' | 'double-pendulum' | 'three-body' | 'mandelbrot' | 'cellular-automata' | 'n-body' | 'boids' | 'henon' | 'duffing';
 
 export default function PlaygroundPage() {
   const [system, setSystem] = useState<System>('lorenz');
@@ -47,6 +47,33 @@ export default function PlaygroundPage() {
   const [caParams, setCaParams] = useState({
     rule: 30,
     cellSize: 4,
+  });
+
+  // N-body parameters
+  const [nBodyParams, setNBodyParams] = useState({
+    n: 7,
+    preset: 'random' as 'random' | 'circular' | 'collision',
+  });
+
+  // Boids parameters
+  const [boidsParams, setBoidsParams] = useState({
+    n: 80,
+    separation: 1.5,
+    alignment: 1.0,
+    cohesion: 1.0,
+  });
+
+  // Henon parameters
+  const [henonParams, setHenonParams] = useState({
+    a: 1.4,
+    b: 0.3,
+  });
+
+  // Duffing parameters
+  const [duffingParams, setDuffingParams] = useState({
+    alpha: -1,
+    beta: 1,
+    gamma: 0.3,
   });
 
   // Cleanup function to stop animation
@@ -106,10 +133,22 @@ export default function PlaygroundPage() {
       case 'cellular-automata':
         animateCellularAutomata(canvas, ctx);
         break;
+      case 'n-body':
+        animateNBody(canvas, ctx);
+        break;
+      case 'boids':
+        animateBoids(canvas, ctx);
+        break;
+      case 'henon':
+        animateHenon(canvas, ctx);
+        break;
+      case 'duffing':
+        animateDuffing(canvas, ctx);
+        break;
     }
 
     return stopAnimation;
-  }, [system, isAnimating, lorenzParams, logisticParams, pendulumParams, threeBodyParams, mandelbrotParams, caParams]);
+  }, [system, isAnimating, lorenzParams, logisticParams, pendulumParams, threeBodyParams, mandelbrotParams, caParams, nBodyParams, boidsParams, henonParams, duffingParams]);
 
   const animateLorenz = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
     let x = 0.1, y = 0, z = 0;
@@ -535,6 +574,358 @@ export default function PlaygroundPage() {
     animate();
   };
 
+  const animateNBody = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    const n = nBodyParams.n;
+    const bodies: { x: number; y: number; vx: number; vy: number; mass: number; color: string }[] = [];
+    const colors = ['#ff0080', '#00ffff', '#ffff00', '#00ff00', '#ff00ff', '#ff8000', '#0080ff'];
+
+    // Initialize based on preset
+    if (nBodyParams.preset === 'random') {
+      for (let i = 0; i < n; i++) {
+        bodies.push({
+          x: (Math.random() - 0.5) * 4,
+          y: (Math.random() - 0.5) * 4,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5,
+          mass: 0.5 + Math.random() * 1.5,
+          color: colors[i % colors.length],
+        });
+      }
+    } else if (nBodyParams.preset === 'circular') {
+      for (let i = 0; i < n; i++) {
+        const angle = (i / n) * Math.PI * 2;
+        const radius = 2;
+        const speed = 0.5;
+        bodies.push({
+          x: radius * Math.cos(angle),
+          y: radius * Math.sin(angle),
+          vx: -speed * Math.sin(angle),
+          vy: speed * Math.cos(angle),
+          mass: 1,
+          color: colors[i % colors.length],
+        });
+      }
+    } else {
+      const halfN = Math.floor(n / 2);
+      for (let i = 0; i < halfN; i++) {
+        bodies.push({
+          x: -2 + (Math.random() - 0.5) * 0.5,
+          y: (Math.random() - 0.5) * 1.5,
+          vx: 0.3,
+          vy: 0,
+          mass: 1,
+          color: colors[0],
+        });
+      }
+      for (let i = halfN; i < n; i++) {
+        bodies.push({
+          x: 2 + (Math.random() - 0.5) * 0.5,
+          y: (Math.random() - 0.5) * 1.5,
+          vx: -0.3,
+          vy: 0,
+          mass: 1,
+          color: colors[2],
+        });
+      }
+    }
+
+    const G = 1;
+    const dt = 0.001;
+    const trails: { x: number; y: number; color: string }[][] = bodies.map(() => []);
+    const maxTrailLength = 300;
+    const scale = 100;
+
+    const animate = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      for (let substep = 0; substep < 20; substep++) {
+        const accelerations = bodies.map(() => ({ ax: 0, ay: 0 }));
+
+        for (let i = 0; i < bodies.length; i++) {
+          for (let j = i + 1; j < bodies.length; j++) {
+            const dx = bodies[j].x - bodies[i].x;
+            const dy = bodies[j].y - bodies[i].y;
+            const r = Math.sqrt(dx * dx + dy * dy);
+            const r3 = Math.max(r * r * r, 0.001);
+
+            const fx = G * dx / r3;
+            const fy = G * dy / r3;
+
+            accelerations[i].ax += bodies[j].mass * fx;
+            accelerations[i].ay += bodies[j].mass * fy;
+            accelerations[j].ax -= bodies[i].mass * fx;
+            accelerations[j].ay -= bodies[i].mass * fy;
+          }
+        }
+
+        for (let i = 0; i < bodies.length; i++) {
+          bodies[i].vx += accelerations[i].ax * dt;
+          bodies[i].vy += accelerations[i].ay * dt;
+          bodies[i].x += bodies[i].vx * dt;
+          bodies[i].y += bodies[i].vy * dt;
+        }
+      }
+
+      bodies.forEach((body, i) => {
+        trails[i].push({ x: centerX + body.x * scale, y: centerY + body.y * scale, color: body.color });
+        if (trails[i].length > maxTrailLength) trails[i].shift();
+      });
+
+      trails.forEach((trail) => {
+        for (let i = 1; i < trail.length; i++) {
+          const alpha = i / trail.length;
+          ctx.strokeStyle = trail[i].color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+          ctx.lineTo(trail[i].x, trail[i].y);
+          ctx.stroke();
+        }
+      });
+
+      bodies.forEach((body) => {
+        const x = centerX + body.x * scale;
+        const y = centerY + body.y * scale;
+        ctx.fillStyle = body.color;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
+
+  const animateBoids = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    const n = boidsParams.n;
+    const boids: { x: number; y: number; vx: number; vy: number }[] = [];
+
+    for (let i = 0; i < n; i++) {
+      boids.push({
+        x: (Math.random() - 0.5) * 10,
+        y: (Math.random() - 0.5) * 10,
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
+      });
+    }
+
+    const perceptionRadius = 2.5;
+    const maxSpeed = 2.5;
+    const maxForce = 0.1;
+    const boundarySize = 15;
+    const scale = 20;
+
+    const animate = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      // Apply boids rules
+      for (let i = 0; i < boids.length; i++) {
+        const boid = boids[i];
+        let sepX = 0, sepY = 0, sepCount = 0;
+        let aliX = 0, aliY = 0, aliCount = 0;
+        let cohX = 0, cohY = 0, cohCount = 0;
+
+        for (let j = 0; j < boids.length; j++) {
+          if (i === j) continue;
+          const other = boids[j];
+          const dx = other.x - boid.x;
+          const dy = other.y - boid.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < perceptionRadius && dist > 0) {
+            if (dist < 1.0) {
+              sepX -= dx / (dist * dist);
+              sepY -= dy / (dist * dist);
+              sepCount++;
+            }
+            aliX += other.vx;
+            aliY += other.vy;
+            aliCount++;
+            cohX += other.x;
+            cohY += other.y;
+            cohCount++;
+          }
+        }
+
+        let ax = 0, ay = 0;
+
+        if (sepCount > 0) {
+          sepX /= sepCount;
+          sepY /= sepCount;
+          const sepMag = Math.sqrt(sepX * sepX + sepY * sepY);
+          if (sepMag > 0) {
+            sepX = (sepX / sepMag) * maxSpeed - boid.vx;
+            sepY = (sepY / sepMag) * maxSpeed - boid.vy;
+            ax += sepX * boidsParams.separation;
+            ay += sepY * boidsParams.separation;
+          }
+        }
+
+        if (aliCount > 0) {
+          aliX /= aliCount;
+          aliY /= aliCount;
+          const aliMag = Math.sqrt(aliX * aliX + aliY * aliY);
+          if (aliMag > 0) {
+            aliX = (aliX / aliMag) * maxSpeed - boid.vx;
+            aliY = (aliY / aliMag) * maxSpeed - boid.vy;
+            ax += aliX * boidsParams.alignment;
+            ay += aliY * boidsParams.alignment;
+          }
+        }
+
+        if (cohCount > 0) {
+          cohX = cohX / cohCount - boid.x;
+          cohY = cohY / cohCount - boid.y;
+          const cohMag = Math.sqrt(cohX * cohX + cohY * cohY);
+          if (cohMag > 0) {
+            cohX = (cohX / cohMag) * maxSpeed - boid.vx;
+            cohY = (cohY / cohMag) * maxSpeed - boid.vy;
+            ax += cohX * boidsParams.cohesion;
+            ay += cohY * boidsParams.cohesion;
+          }
+        }
+
+        const forceMag = Math.sqrt(ax * ax + ay * ay);
+        if (forceMag > maxForce) {
+          ax = (ax / forceMag) * maxForce;
+          ay = (ay / forceMag) * maxForce;
+        }
+
+        boid.vx += ax;
+        boid.vy += ay;
+
+        const speed = Math.sqrt(boid.vx * boid.vx + boid.vy * boid.vy);
+        if (speed > maxSpeed) {
+          boid.vx = (boid.vx / speed) * maxSpeed;
+          boid.vy = (boid.vy / speed) * maxSpeed;
+        }
+
+        boid.x += boid.vx * 0.05;
+        boid.y += boid.vy * 0.05;
+
+        if (boid.x > boundarySize) boid.x = -boundarySize;
+        if (boid.x < -boundarySize) boid.x = boundarySize;
+        if (boid.y > boundarySize) boid.y = -boundarySize;
+        if (boid.y < -boundarySize) boid.y = boundarySize;
+      }
+
+      // Draw boids
+      boids.forEach((boid) => {
+        const x = centerX + boid.x * scale;
+        const y = centerY + boid.y * scale;
+        const angle = Math.atan2(boid.vy, boid.vx);
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillStyle = '#00ffff';
+        ctx.beginPath();
+        ctx.moveTo(6, 0);
+        ctx.lineTo(-4, 3);
+        ctx.lineTo(-4, -3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
+
+  const animateHenon = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    let x = 0;
+    let y = 0;
+    const points: { x: number; y: number }[] = [];
+    const maxPoints = 5000;
+
+    const animate = () => {
+      if (points.length < maxPoints) {
+        const xNext = 1 - henonParams.a * x * x + y;
+        const yNext = henonParams.b * x;
+        x = xNext;
+        y = yNext;
+        points.push({ x, y });
+      }
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.02)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const scale = 200;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      points.forEach((p, i) => {
+        const alpha = i / points.length;
+        const hue = (i / points.length) * 280;
+        ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha * 0.5})`;
+        ctx.fillRect(centerX + p.x * scale - 1, centerY + p.y * scale - 1, 2, 2);
+      });
+
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
+
+  const animateDuffing = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    let x = 0.1;
+    let v = 0;
+    let t = 0;
+    const points: { x: number; v: number }[] = [];
+    const maxPoints = 3000;
+    const dt = 0.01;
+    const delta = 0.2;
+    const omega = 1.2;
+
+    const animate = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < 5; i++) {
+        const acceleration = -delta * v - duffingParams.alpha * x - duffingParams.beta * Math.pow(x, 3) + duffingParams.gamma * Math.cos(omega * t);
+        v += acceleration * dt;
+        x += v * dt;
+        t += dt;
+
+        points.push({ x, v });
+        if (points.length > maxPoints) points.shift();
+      }
+
+      const scale = 80;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      for (let i = 1; i < points.length; i++) {
+        const p1 = points[i - 1];
+        const p2 = points[i];
+        const alpha = i / points.length;
+        const hue = (i / points.length) * 280;
+        ctx.strokeStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(centerX + p1.x * scale, centerY + p1.v * scale);
+        ctx.lineTo(centerX + p2.x * scale, centerY + p2.v * scale);
+        ctx.stroke();
+      }
+
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
+
   return (
     <main className="min-h-screen">
       <div className="container mx-auto px-4 py-16">
@@ -550,19 +941,23 @@ export default function PlaygroundPage() {
             Chaos Playground
           </h1>
           <p className="text-xl text-gray-300">
-            Experiment with all six chaotic systems in real-time
+            Experiment with all chaotic systems in real-time
           </p>
         </div>
 
         {/* System Selector */}
         <div className="flex gap-3 mb-8 flex-wrap">
           {[
-            { id: 'lorenz', name: 'Lorenz Attractor', emoji: '🌀' },
-            { id: 'logistic-map', name: 'Logistic Map', emoji: '📊' },
-            { id: 'double-pendulum', name: 'Double Pendulum', emoji: '⚡' },
+            { id: 'lorenz', name: 'Lorenz', emoji: '🌀' },
+            { id: 'logistic-map', name: 'Logistic', emoji: '📊' },
+            { id: 'double-pendulum', name: 'Pendulum', emoji: '⚡' },
             { id: 'three-body', name: 'Three-Body', emoji: '🌍' },
             { id: 'mandelbrot', name: 'Mandelbrot', emoji: '🎨' },
-            { id: 'cellular-automata', name: 'Cellular Automata', emoji: '🔬' },
+            { id: 'cellular-automata', name: 'Cellular', emoji: '🔬' },
+            { id: 'n-body', name: 'N-Body', emoji: '🪐' },
+            { id: 'boids', name: 'Boids', emoji: '🐦' },
+            { id: 'henon', name: 'Hénon', emoji: '💫' },
+            { id: 'duffing', name: 'Duffing', emoji: '〰️' },
           ].map((sys) => (
             <button
               key={sys.id}
