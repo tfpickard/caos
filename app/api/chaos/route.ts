@@ -54,6 +54,17 @@ export async function GET() {
         },
         example: '/api/chaos/double-pendulum?theta1=1.5&theta2=2.5&duration=5',
       },
+      '/api/chaos/three-body': {
+        description: 'Simulate three-body gravitational system',
+        method: 'GET',
+        parameters: {
+          duration: { type: 'number', default: 20, max: 100, description: 'Simulation duration (time units)' },
+          dt: { type: 'number', default: 0.001, description: 'Time step' },
+          G: { type: 'number', default: 1, description: 'Gravitational constant' },
+          preset: { type: 'string', default: 'figure8', options: ['figure8', 'lagrange', 'butterfly', 'random'], description: 'Initial configuration' },
+        },
+        example: '/api/chaos/three-body?preset=figure8&duration=20',
+      },
       '/api/chaos/mandelbrot': {
         description: 'Generate Mandelbrot set data',
         method: 'GET',
