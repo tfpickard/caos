@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 
-type System = 'lorenz' | 'double-pendulum' | 'cellular-automata';
+type System = 'lorenz' | 'logistic-map' | 'double-pendulum' | 'three-body' | 'mandelbrot' | 'cellular-automata' | 'n-body' | 'boids' | 'henon' | 'duffing';
 
 export default function PlaygroundPage() {
   const [system, setSystem] = useState<System>('lorenz');
   const [isAnimating, setIsAnimating] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationIdRef = useRef<number | null>(null);
 
   // Lorenz parameters
   const [lorenzParams, setLorenzParams] = useState({
@@ -17,12 +18,29 @@ export default function PlaygroundPage() {
     beta: 2.667,
   });
 
+  // Logistic map parameters
+  const [logisticParams, setLogisticParams] = useState({
+    r: 3.7,
+    x0: 0.5,
+  });
+
   // Double pendulum parameters
   const [pendulumParams, setPendulumParams] = useState({
     theta1: 1.5,
     theta2: 2.0,
-    length1: 150,
-    length2: 150,
+  });
+
+  // Three-body parameters
+  const [threeBodyParams, setThreeBodyParams] = useState({
+    preset: 'figure8' as 'figure8' | 'lagrange' | 'butterfly' | 'random',
+  });
+
+  // Mandelbrot parameters
+  const [mandelbrotParams, setMandelbrotParams] = useState({
+    centerX: -0.5,
+    centerY: 0,
+    zoom: 1,
+    maxIterations: 100,
   });
 
   // Cellular automata parameters
@@ -31,30 +49,115 @@ export default function PlaygroundPage() {
     cellSize: 4,
   });
 
-  // Lorenz animation
-  useEffect(() => {
-    if (system !== 'lorenz' || !isAnimating) return;
+  // N-body parameters
+  const [nBodyParams, setNBodyParams] = useState({
+    n: 7,
+    preset: 'random' as 'random' | 'circular' | 'collision',
+  });
 
+  // Boids parameters
+  const [boidsParams, setBoidsParams] = useState({
+    n: 80,
+    separation: 1.5,
+    alignment: 1.0,
+    cohesion: 1.0,
+  });
+
+  // Henon parameters
+  const [henonParams, setHenonParams] = useState({
+    a: 1.4,
+    b: 0.3,
+  });
+
+  // Duffing parameters
+  const [duffingParams, setDuffingParams] = useState({
+    alpha: -1,
+    beta: 1,
+    gamma: 0.3,
+  });
+
+  // Cleanup function to stop animation
+  const stopAnimation = () => {
+    if (animationIdRef.current !== null) {
+      cancelAnimationFrame(animationIdRef.current);
+      animationIdRef.current = null;
+    }
+  };
+
+  // System change handler
+  const handleSystemChange = (newSystem: System) => {
+    stopAnimation();
+    setSystem(newSystem);
+    setIsAnimating(false);
+    setTimeout(() => setIsAnimating(true), 100);
+  };
+
+  // Main animation effect
+  useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Stop any existing animation
+    stopAnimation();
+
+    // Set canvas size
     canvas.width = canvas.offsetWidth;
     canvas.height = 600;
 
-    let x = 0.1;
-    let y = 0;
-    let z = 0;
+    // Clear canvas
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (!isAnimating) return;
+
+    // Start appropriate animation
+    switch (system) {
+      case 'lorenz':
+        animateLorenz(canvas, ctx);
+        break;
+      case 'logistic-map':
+        animateLogisticMap(canvas, ctx);
+        break;
+      case 'double-pendulum':
+        animateDoublePendulum(canvas, ctx);
+        break;
+      case 'three-body':
+        animateThreeBody(canvas, ctx);
+        break;
+      case 'mandelbrot':
+        animateMandelbrot(canvas, ctx);
+        break;
+      case 'cellular-automata':
+        animateCellularAutomata(canvas, ctx);
+        break;
+      case 'n-body':
+        animateNBody(canvas, ctx);
+        break;
+      case 'boids':
+        animateBoids(canvas, ctx);
+        break;
+      case 'henon':
+        animateHenon(canvas, ctx);
+        break;
+      case 'duffing':
+        animateDuffing(canvas, ctx);
+        break;
+    }
+
+    return stopAnimation;
+  }, [system, isAnimating, lorenzParams, logisticParams, pendulumParams, threeBodyParams, mandelbrotParams, caParams, nBodyParams, boidsParams, henonParams, duffingParams]);
+
+  const animateLorenz = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    let x = 0.1, y = 0, z = 0;
     const dt = 0.01;
     const points: { x: number; y: number; z: number }[] = [];
     const maxPoints = 2000;
     let angleY = 0;
 
     const animate = () => {
-      if (!isAnimating) return;
-
       ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -99,34 +202,88 @@ export default function PlaygroundPage() {
         ctx.stroke();
       }
 
-      requestAnimationFrame(animate);
+      animationIdRef.current = requestAnimationFrame(animate);
     };
 
     animate();
-  }, [system, isAnimating, lorenzParams]);
+  };
 
-  // Double pendulum animation
-  useEffect(() => {
-    if (system !== 'double-pendulum' || !isAnimating) return;
+  const animateLogisticMap = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    let iteration = 0;
+    const values: number[] = [];
+    let x = logisticParams.x0;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    const animate = () => {
+      // Draw bifurcation background
+      if (iteration === 0) {
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+        // Draw bifurcation diagram
+        const rMin = 2.5;
+        const rMax = 4.0;
+        const rSteps = canvas.width;
 
-    canvas.width = canvas.offsetWidth;
-    canvas.height = 600;
+        for (let i = 0; i < rSteps; i++) {
+          const r = rMin + (i / rSteps) * (rMax - rMin);
+          let xTemp = 0.5;
 
+          for (let j = 0; j < 300; j++) {
+            xTemp = r * xTemp * (1 - xTemp);
+          }
+
+          for (let j = 0; j < 100; j++) {
+            xTemp = r * xTemp * (1 - xTemp);
+            const px = i;
+            const py = canvas.height - xTemp * canvas.height;
+            const hue = ((r - rMin) / (rMax - rMin)) * 280;
+            ctx.fillStyle = `hsla(${hue}, 100%, 60%, 0.1)`;
+            ctx.fillRect(px, py, 1, 1);
+          }
+        }
+      }
+
+      // Animate current r value
+      x = logisticParams.r * x * (1 - x);
+      values.push(x);
+      if (values.length > 200) values.shift();
+
+      // Draw current iteration line
+      const rPos = ((logisticParams.r - 2.5) / (4.0 - 2.5)) * canvas.width;
+      ctx.strokeStyle = '#ff0';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(rPos, 0);
+      ctx.lineTo(rPos, canvas.height);
+      ctx.stroke();
+
+      // Draw time series
+      ctx.strokeStyle = '#0ff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i < values.length; i++) {
+        const px = rPos + 100 + (i / values.length) * 200;
+        const py = canvas.height - values[i] * canvas.height * 0.5;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      iteration++;
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
+
+  const animateDoublePendulum = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
     let theta1 = pendulumParams.theta1;
     let theta2 = pendulumParams.theta2;
     let omega1 = 0;
     let omega2 = 0;
 
-    const m1 = 1;
-    const m2 = 1;
-    const L1 = pendulumParams.length1;
-    const L2 = pendulumParams.length2;
+    const m1 = 1, m2 = 1;
+    const L1 = 150, L2 = 150;
     const g = 9.81;
     const dt = 0.05;
 
@@ -134,22 +291,17 @@ export default function PlaygroundPage() {
     const maxTrail = 500;
 
     const animate = () => {
-      if (!isAnimating) return;
-
       ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Calculate positions
       const x1 = canvas.width / 2 + L1 * Math.sin(theta1);
       const y1 = 200 + L1 * Math.cos(theta1);
       const x2 = x1 + L2 * Math.sin(theta2);
       const y2 = y1 + L2 * Math.cos(theta2);
 
-      // Add to trail
       trail.push({ x: x2, y: y2 });
       if (trail.length > maxTrail) trail.shift();
 
-      // Draw trail
       for (let i = 1; i < trail.length; i++) {
         const alpha = i / trail.length;
         ctx.strokeStyle = `hsla(${(i / trail.length) * 360}, 100%, 60%, ${alpha})`;
@@ -160,7 +312,6 @@ export default function PlaygroundPage() {
         ctx.stroke();
       }
 
-      // Draw pendulum
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -169,7 +320,6 @@ export default function PlaygroundPage() {
       ctx.lineTo(x2, y2);
       ctx.stroke();
 
-      // Draw bobs
       ctx.fillStyle = '#f0f';
       ctx.beginPath();
       ctx.arc(x1, y1, 10, 0, Math.PI * 2);
@@ -180,7 +330,6 @@ export default function PlaygroundPage() {
       ctx.arc(x2, y2, 10, 0, Math.PI * 2);
       ctx.fill();
 
-      // Update physics
       const delta = theta2 - theta1;
       const den1 = (m1 + m2) * L1 - m2 * L1 * Math.cos(delta) * Math.cos(delta);
       const den2 = (L2 / L1) * den1;
@@ -204,25 +353,169 @@ export default function PlaygroundPage() {
       theta1 += omega1 * dt;
       theta2 += omega2 * dt;
 
-      requestAnimationFrame(animate);
+      animationIdRef.current = requestAnimationFrame(animate);
     };
 
     animate();
-  }, [system, isAnimating, pendulumParams]);
+  };
 
-  // Cellular automata animation
-  useEffect(() => {
-    if (system !== 'cellular-automata' || !isAnimating) return;
+  const animateThreeBody = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    const colors = ['#ff0080', '#00ffff', '#ffff00'];
+    let bodies: { x: number; y: number; vx: number; vy: number; mass: number; color: string }[] = [];
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    switch (threeBodyParams.preset) {
+      case 'figure8':
+        bodies = [
+          { x: 0.97000436, y: -0.24308753, vx: 0.466203685, vy: 0.43236573, mass: 1, color: colors[0] },
+          { x: -0.97000436, y: 0.24308753, vx: 0.466203685, vy: 0.43236573, mass: 1, color: colors[1] },
+          { x: 0, y: 0, vx: -0.93240737, vy: -0.86473146, mass: 1, color: colors[2] },
+        ];
+        break;
+      case 'lagrange':
+        bodies = [
+          { x: -0.5, y: -0.288675, vx: 0.5, vy: -0.866025, mass: 1, color: colors[0] },
+          { x: 0.5, y: -0.288675, vx: 0.5, vy: 0.866025, mass: 1, color: colors[1] },
+          { x: 0, y: 0.57735, vx: -1, vy: 0, mass: 1, color: colors[2] },
+        ];
+        break;
+      case 'butterfly':
+        bodies = [
+          { x: -1, y: 0, vx: 0.347111, vy: 0.532728, mass: 1, color: colors[0] },
+          { x: 1, y: 0, vx: 0.347111, vy: 0.532728, mass: 1, color: colors[1] },
+          { x: 0, y: 0, vx: -0.694222, vy: -1.065456, mass: 1, color: colors[2] },
+        ];
+        break;
+      case 'random':
+        bodies = [
+          { x: -1, y: 0, vx: 0, vy: 0.5, mass: 1, color: colors[0] },
+          { x: 1, y: 0, vx: 0, vy: -0.5, mass: 1, color: colors[1] },
+          { x: 0, y: 1.5, vx: -0.3, vy: 0, mass: 1, color: colors[2] },
+        ];
+        break;
+    }
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const G = 1;
+    const dt = 0.001;
+    const trails: { x: number; y: number; color: string }[][] = [[], [], []];
+    const maxTrailLength = 500;
+    const scale = 120;
 
-    canvas.width = canvas.offsetWidth;
-    canvas.height = 600;
+    const animate = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      for (let substep = 0; substep < 50; substep++) {
+        const accelerations = bodies.map(() => ({ ax: 0, ay: 0 }));
+
+        for (let i = 0; i < bodies.length; i++) {
+          for (let j = i + 1; j < bodies.length; j++) {
+            const dx = bodies[j].x - bodies[i].x;
+            const dy = bodies[j].y - bodies[i].y;
+            const r = Math.sqrt(dx * dx + dy * dy);
+            const r3 = Math.max(r * r * r, 0.001);
+
+            const fx = G * dx / r3;
+            const fy = G * dy / r3;
+
+            accelerations[i].ax += bodies[j].mass * fx;
+            accelerations[i].ay += bodies[j].mass * fy;
+            accelerations[j].ax -= bodies[i].mass * fx;
+            accelerations[j].ay -= bodies[i].mass * fy;
+          }
+        }
+
+        for (let i = 0; i < bodies.length; i++) {
+          bodies[i].vx += accelerations[i].ax * dt;
+          bodies[i].vy += accelerations[i].ay * dt;
+          bodies[i].x += bodies[i].vx * dt;
+          bodies[i].y += bodies[i].vy * dt;
+        }
+      }
+
+      bodies.forEach((body, i) => {
+        trails[i].push({
+          x: centerX + body.x * scale,
+          y: centerY + body.y * scale,
+          color: body.color,
+        });
+        if (trails[i].length > maxTrailLength) trails[i].shift();
+      });
+
+      trails.forEach((trail) => {
+        for (let i = 1; i < trail.length; i++) {
+          const alpha = i / trail.length;
+          ctx.strokeStyle = trail[i].color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+          ctx.lineTo(trail[i].x, trail[i].y);
+          ctx.stroke();
+        }
+      });
+
+      bodies.forEach((body) => {
+        const x = centerX + body.x * scale;
+        const y = centerY + body.y * scale;
+
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 15);
+        gradient.addColorStop(0, body.color);
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, 15, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = body.color;
+        ctx.beginPath();
+        ctx.arc(x, y, 6, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
+
+  const animateMandelbrot = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    const width = canvas.width;
+    const height = canvas.height;
+    const xMin = mandelbrotParams.centerX - 2 / mandelbrotParams.zoom;
+    const xMax = mandelbrotParams.centerX + 2 / mandelbrotParams.zoom;
+    const yMin = mandelbrotParams.centerY - 1.5 / mandelbrotParams.zoom;
+    const yMax = mandelbrotParams.centerY + 1.5 / mandelbrotParams.zoom;
+
+    for (let py = 0; py < height; py++) {
+      const y = yMin + (py / height) * (yMax - yMin);
+
+      for (let px = 0; px < width; px++) {
+        const x = xMin + (px / width) * (xMax - xMin);
+
+        let zx = 0, zy = 0;
+        let iteration = 0;
+
+        while (zx * zx + zy * zy < 4 && iteration < mandelbrotParams.maxIterations) {
+          const xtemp = zx * zx - zy * zy + x;
+          zy = 2 * zx * zy + y;
+          zx = xtemp;
+          iteration++;
+        }
+
+        if (iteration === mandelbrotParams.maxIterations) {
+          ctx.fillStyle = '#000';
+        } else {
+          const hue = (iteration / mandelbrotParams.maxIterations) * 360;
+          ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+        }
+        ctx.fillRect(px, py, 1, 1);
+      }
+    }
+  };
+
+  const animateCellularAutomata = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
     const cellSize = caParams.cellSize;
     const cols = Math.floor(canvas.width / cellSize);
     const rows = Math.floor(canvas.height / cellSize);
@@ -245,9 +538,14 @@ export default function PlaygroundPage() {
     let row = 0;
 
     const animate = () => {
-      if (!isAnimating || row >= rows) return;
+      if (row >= rows) {
+        row = 0;
+        current = new Array(cols).fill(0);
+        current[Math.floor(cols / 2)] = 1;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
-      // Draw current generation
       for (let i = 0; i < cols; i++) {
         if (current[i] === 1) {
           const hue = (row / rows) * 360;
@@ -256,7 +554,6 @@ export default function PlaygroundPage() {
         }
       }
 
-      // Calculate next generation
       const next = new Array(cols).fill(0);
       for (let i = 0; i < cols; i++) {
         const left = current[(i - 1 + cols) % cols];
@@ -269,13 +566,365 @@ export default function PlaygroundPage() {
       current = next;
       row++;
 
-      setTimeout(() => requestAnimationFrame(animate), 50);
+      setTimeout(() => {
+        animationIdRef.current = requestAnimationFrame(animate);
+      }, 50);
     };
 
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
     animate();
-  }, [system, isAnimating, caParams]);
+  };
+
+  const animateNBody = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    const n = nBodyParams.n;
+    const bodies: { x: number; y: number; vx: number; vy: number; mass: number; color: string }[] = [];
+    const colors = ['#ff0080', '#00ffff', '#ffff00', '#00ff00', '#ff00ff', '#ff8000', '#0080ff'];
+
+    // Initialize based on preset
+    if (nBodyParams.preset === 'random') {
+      for (let i = 0; i < n; i++) {
+        bodies.push({
+          x: (Math.random() - 0.5) * 4,
+          y: (Math.random() - 0.5) * 4,
+          vx: (Math.random() - 0.5) * 0.5,
+          vy: (Math.random() - 0.5) * 0.5,
+          mass: 0.5 + Math.random() * 1.5,
+          color: colors[i % colors.length],
+        });
+      }
+    } else if (nBodyParams.preset === 'circular') {
+      for (let i = 0; i < n; i++) {
+        const angle = (i / n) * Math.PI * 2;
+        const radius = 2;
+        const speed = 0.5;
+        bodies.push({
+          x: radius * Math.cos(angle),
+          y: radius * Math.sin(angle),
+          vx: -speed * Math.sin(angle),
+          vy: speed * Math.cos(angle),
+          mass: 1,
+          color: colors[i % colors.length],
+        });
+      }
+    } else {
+      const halfN = Math.floor(n / 2);
+      for (let i = 0; i < halfN; i++) {
+        bodies.push({
+          x: -2 + (Math.random() - 0.5) * 0.5,
+          y: (Math.random() - 0.5) * 1.5,
+          vx: 0.3,
+          vy: 0,
+          mass: 1,
+          color: colors[0],
+        });
+      }
+      for (let i = halfN; i < n; i++) {
+        bodies.push({
+          x: 2 + (Math.random() - 0.5) * 0.5,
+          y: (Math.random() - 0.5) * 1.5,
+          vx: -0.3,
+          vy: 0,
+          mass: 1,
+          color: colors[2],
+        });
+      }
+    }
+
+    const G = 1;
+    const dt = 0.001;
+    const trails: { x: number; y: number; color: string }[][] = bodies.map(() => []);
+    const maxTrailLength = 300;
+    const scale = 100;
+
+    const animate = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      for (let substep = 0; substep < 20; substep++) {
+        const accelerations = bodies.map(() => ({ ax: 0, ay: 0 }));
+
+        for (let i = 0; i < bodies.length; i++) {
+          for (let j = i + 1; j < bodies.length; j++) {
+            const dx = bodies[j].x - bodies[i].x;
+            const dy = bodies[j].y - bodies[i].y;
+            const r = Math.sqrt(dx * dx + dy * dy);
+            const r3 = Math.max(r * r * r, 0.001);
+
+            const fx = G * dx / r3;
+            const fy = G * dy / r3;
+
+            accelerations[i].ax += bodies[j].mass * fx;
+            accelerations[i].ay += bodies[j].mass * fy;
+            accelerations[j].ax -= bodies[i].mass * fx;
+            accelerations[j].ay -= bodies[i].mass * fy;
+          }
+        }
+
+        for (let i = 0; i < bodies.length; i++) {
+          bodies[i].vx += accelerations[i].ax * dt;
+          bodies[i].vy += accelerations[i].ay * dt;
+          bodies[i].x += bodies[i].vx * dt;
+          bodies[i].y += bodies[i].vy * dt;
+        }
+      }
+
+      bodies.forEach((body, i) => {
+        trails[i].push({ x: centerX + body.x * scale, y: centerY + body.y * scale, color: body.color });
+        if (trails[i].length > maxTrailLength) trails[i].shift();
+      });
+
+      trails.forEach((trail) => {
+        for (let i = 1; i < trail.length; i++) {
+          const alpha = i / trail.length;
+          ctx.strokeStyle = trail[i].color.replace(')', `, ${alpha})`).replace('rgb', 'rgba');
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(trail[i - 1].x, trail[i - 1].y);
+          ctx.lineTo(trail[i].x, trail[i].y);
+          ctx.stroke();
+        }
+      });
+
+      bodies.forEach((body) => {
+        const x = centerX + body.x * scale;
+        const y = centerY + body.y * scale;
+        ctx.fillStyle = body.color;
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
+
+  const animateBoids = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    const n = boidsParams.n;
+    const boids: { x: number; y: number; vx: number; vy: number }[] = [];
+
+    for (let i = 0; i < n; i++) {
+      boids.push({
+        x: (Math.random() - 0.5) * 10,
+        y: (Math.random() - 0.5) * 10,
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
+      });
+    }
+
+    const perceptionRadius = 2.5;
+    const maxSpeed = 2.5;
+    const maxForce = 0.1;
+    const boundarySize = 15;
+    const scale = 20;
+
+    const animate = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      // Apply boids rules
+      for (let i = 0; i < boids.length; i++) {
+        const boid = boids[i];
+        let sepX = 0, sepY = 0, sepCount = 0;
+        let aliX = 0, aliY = 0, aliCount = 0;
+        let cohX = 0, cohY = 0, cohCount = 0;
+
+        for (let j = 0; j < boids.length; j++) {
+          if (i === j) continue;
+          const other = boids[j];
+          const dx = other.x - boid.x;
+          const dy = other.y - boid.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < perceptionRadius && dist > 0) {
+            if (dist < 1.0) {
+              sepX -= dx / (dist * dist);
+              sepY -= dy / (dist * dist);
+              sepCount++;
+            }
+            aliX += other.vx;
+            aliY += other.vy;
+            aliCount++;
+            cohX += other.x;
+            cohY += other.y;
+            cohCount++;
+          }
+        }
+
+        let ax = 0, ay = 0;
+
+        if (sepCount > 0) {
+          sepX /= sepCount;
+          sepY /= sepCount;
+          const sepMag = Math.sqrt(sepX * sepX + sepY * sepY);
+          if (sepMag > 0) {
+            sepX = (sepX / sepMag) * maxSpeed - boid.vx;
+            sepY = (sepY / sepMag) * maxSpeed - boid.vy;
+            ax += sepX * boidsParams.separation;
+            ay += sepY * boidsParams.separation;
+          }
+        }
+
+        if (aliCount > 0) {
+          aliX /= aliCount;
+          aliY /= aliCount;
+          const aliMag = Math.sqrt(aliX * aliX + aliY * aliY);
+          if (aliMag > 0) {
+            aliX = (aliX / aliMag) * maxSpeed - boid.vx;
+            aliY = (aliY / aliMag) * maxSpeed - boid.vy;
+            ax += aliX * boidsParams.alignment;
+            ay += aliY * boidsParams.alignment;
+          }
+        }
+
+        if (cohCount > 0) {
+          cohX = cohX / cohCount - boid.x;
+          cohY = cohY / cohCount - boid.y;
+          const cohMag = Math.sqrt(cohX * cohX + cohY * cohY);
+          if (cohMag > 0) {
+            cohX = (cohX / cohMag) * maxSpeed - boid.vx;
+            cohY = (cohY / cohMag) * maxSpeed - boid.vy;
+            ax += cohX * boidsParams.cohesion;
+            ay += cohY * boidsParams.cohesion;
+          }
+        }
+
+        const forceMag = Math.sqrt(ax * ax + ay * ay);
+        if (forceMag > maxForce) {
+          ax = (ax / forceMag) * maxForce;
+          ay = (ay / forceMag) * maxForce;
+        }
+
+        boid.vx += ax;
+        boid.vy += ay;
+
+        const speed = Math.sqrt(boid.vx * boid.vx + boid.vy * boid.vy);
+        if (speed > maxSpeed) {
+          boid.vx = (boid.vx / speed) * maxSpeed;
+          boid.vy = (boid.vy / speed) * maxSpeed;
+        }
+
+        boid.x += boid.vx * 0.05;
+        boid.y += boid.vy * 0.05;
+
+        if (boid.x > boundarySize) boid.x = -boundarySize;
+        if (boid.x < -boundarySize) boid.x = boundarySize;
+        if (boid.y > boundarySize) boid.y = -boundarySize;
+        if (boid.y < -boundarySize) boid.y = boundarySize;
+      }
+
+      // Draw boids
+      boids.forEach((boid) => {
+        const x = centerX + boid.x * scale;
+        const y = centerY + boid.y * scale;
+        const angle = Math.atan2(boid.vy, boid.vx);
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillStyle = '#00ffff';
+        ctx.beginPath();
+        ctx.moveTo(6, 0);
+        ctx.lineTo(-4, 3);
+        ctx.lineTo(-4, -3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      });
+
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
+
+  const animateHenon = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    let x = 0;
+    let y = 0;
+    const points: { x: number; y: number }[] = [];
+    const maxPoints = 5000;
+
+    const animate = () => {
+      if (points.length < maxPoints) {
+        const xNext = 1 - henonParams.a * x * x + y;
+        const yNext = henonParams.b * x;
+        x = xNext;
+        y = yNext;
+        points.push({ x, y });
+      }
+
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.02)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const scale = 200;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      points.forEach((p, i) => {
+        const alpha = i / points.length;
+        const hue = (i / points.length) * 280;
+        ctx.fillStyle = `hsla(${hue}, 100%, 60%, ${alpha * 0.5})`;
+        ctx.fillRect(centerX + p.x * scale - 1, centerY + p.y * scale - 1, 2, 2);
+      });
+
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
+
+  const animateDuffing = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
+    let x = 0.1;
+    let v = 0;
+    let t = 0;
+    const points: { x: number; v: number }[] = [];
+    const maxPoints = 3000;
+    const dt = 0.01;
+    const delta = 0.2;
+    const omega = 1.2;
+
+    const animate = () => {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < 5; i++) {
+        const acceleration = -delta * v - duffingParams.alpha * x - duffingParams.beta * Math.pow(x, 3) + duffingParams.gamma * Math.cos(omega * t);
+        v += acceleration * dt;
+        x += v * dt;
+        t += dt;
+
+        points.push({ x, v });
+        if (points.length > maxPoints) points.shift();
+      }
+
+      const scale = 80;
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+
+      for (let i = 1; i < points.length; i++) {
+        const p1 = points[i - 1];
+        const p2 = points[i];
+        const alpha = i / points.length;
+        const hue = (i / points.length) * 280;
+        ctx.strokeStyle = `hsla(${hue}, 100%, 60%, ${alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(centerX + p1.x * scale, centerY + p1.v * scale);
+        ctx.lineTo(centerX + p2.x * scale, centerY + p2.v * scale);
+        ctx.stroke();
+      }
+
+      animationIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
 
   return (
     <main className="min-h-screen">
@@ -292,61 +941,44 @@ export default function PlaygroundPage() {
             Chaos Playground
           </h1>
           <p className="text-xl text-gray-300">
-            Experiment with chaotic systems in real-time
+            Experiment with all chaotic systems in real-time
           </p>
         </div>
 
         {/* System Selector */}
-        <div className="flex gap-4 mb-8 flex-wrap">
-          <button
-            onClick={() => {
-              setSystem('lorenz');
-              setIsAnimating(false);
-              setTimeout(() => setIsAnimating(true), 100);
-            }}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-              system === 'lorenz'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-          >
-            Lorenz Attractor
-          </button>
-          <button
-            onClick={() => {
-              setSystem('double-pendulum');
-              setIsAnimating(false);
-              setTimeout(() => setIsAnimating(true), 100);
-            }}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-              system === 'double-pendulum'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-          >
-            Double Pendulum
-          </button>
-          <button
-            onClick={() => {
-              setSystem('cellular-automata');
-              setIsAnimating(false);
-              setTimeout(() => setIsAnimating(true), 100);
-            }}
-            className={`px-6 py-3 rounded-lg font-semibold transition-all ${
-              system === 'cellular-automata'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-            }`}
-          >
-            Cellular Automata
-          </button>
+        <div className="flex gap-3 mb-8 flex-wrap">
+          {[
+            { id: 'lorenz', name: 'Lorenz', emoji: '🌀' },
+            { id: 'logistic-map', name: 'Logistic', emoji: '📊' },
+            { id: 'double-pendulum', name: 'Pendulum', emoji: '⚡' },
+            { id: 'three-body', name: 'Three-Body', emoji: '🌍' },
+            { id: 'mandelbrot', name: 'Mandelbrot', emoji: '🎨' },
+            { id: 'cellular-automata', name: 'Cellular', emoji: '🔬' },
+            { id: 'n-body', name: 'N-Body', emoji: '🪐' },
+            { id: 'boids', name: 'Boids', emoji: '🐦' },
+            { id: 'henon', name: 'Hénon', emoji: '💫' },
+            { id: 'duffing', name: 'Duffing', emoji: '〰️' },
+          ].map((sys) => (
+            <button
+              key={sys.id}
+              onClick={() => handleSystemChange(sys.id as System)}
+              className={`px-4 py-2 rounded-lg font-semibold transition-all ${
+                system === sys.id
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+              }`}
+            >
+              <span className="mr-2">{sys.emoji}</span>
+              {sys.name}
+            </button>
+          ))}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Canvas */}
           <div className="lg:col-span-2">
             <div className="bg-black/40 backdrop-blur-lg rounded-2xl p-6 border border-purple-500/30">
-              <canvas ref={canvasRef} className="w-full rounded-lg" />
+              <canvas ref={canvasRef} className="w-full rounded-lg bg-black" />
               <div className="mt-4 flex justify-center gap-4">
                 <button
                   onClick={() => setIsAnimating(!isAnimating)}
@@ -356,6 +988,7 @@ export default function PlaygroundPage() {
                 </button>
                 <button
                   onClick={() => {
+                    stopAnimation();
                     setIsAnimating(false);
                     setTimeout(() => setIsAnimating(true), 100);
                   }}
@@ -430,6 +1063,31 @@ export default function PlaygroundPage() {
                 </div>
               )}
 
+              {system === 'logistic-map' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm mb-2 text-gray-300">
+                      r parameter: <span className="text-purple-400">{logisticParams.r.toFixed(2)}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="2.5"
+                      max="4.0"
+                      step="0.01"
+                      value={logisticParams.r}
+                      onChange={(e) =>
+                        setLogisticParams({ ...logisticParams, r: parseFloat(e.target.value) })
+                      }
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="mt-4 p-3 bg-black/40 rounded text-xs text-gray-400">
+                    <p className="font-mono">x<sub>n+1</sub> = r · x<sub>n</sub> · (1 - x<sub>n</sub>)</p>
+                    <p className="mt-2">Shows the famous bifurcation diagram and period-doubling route to chaos.</p>
+                  </div>
+                </div>
+              )}
+
               {system === 'double-pendulum' && (
                 <div className="space-y-4">
                   <div>
@@ -444,6 +1102,7 @@ export default function PlaygroundPage() {
                       value={pendulumParams.theta1}
                       onChange={(e) => {
                         setPendulumParams({ ...pendulumParams, theta1: parseFloat(e.target.value) });
+                        stopAnimation();
                         setIsAnimating(false);
                         setTimeout(() => setIsAnimating(true), 100);
                       }}
@@ -462,6 +1121,7 @@ export default function PlaygroundPage() {
                       value={pendulumParams.theta2}
                       onChange={(e) => {
                         setPendulumParams({ ...pendulumParams, theta2: parseFloat(e.target.value) });
+                        stopAnimation();
                         setIsAnimating(false);
                         setTimeout(() => setIsAnimating(true), 100);
                       }}
@@ -471,6 +1131,80 @@ export default function PlaygroundPage() {
                   <div className="mt-4 p-3 bg-black/40 rounded text-xs text-gray-400">
                     <p>Extremely sensitive to initial conditions!</p>
                     <p className="mt-2">Try tiny changes in angles to see dramatically different outcomes.</p>
+                  </div>
+                </div>
+              )}
+
+              {system === 'three-body' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm mb-2 text-gray-300">Preset Configuration</label>
+                    <select
+                      value={threeBodyParams.preset}
+                      onChange={(e) => {
+                        setThreeBodyParams({ preset: e.target.value as any });
+                        stopAnimation();
+                        setIsAnimating(false);
+                        setTimeout(() => setIsAnimating(true), 100);
+                      }}
+                      className="w-full px-3 py-2 bg-gray-800 text-white rounded-lg"
+                    >
+                      <option value="figure8">Figure-8 (Periodic)</option>
+                      <option value="lagrange">Lagrange (Stable)</option>
+                      <option value="butterfly">Butterfly</option>
+                      <option value="random">Chaotic</option>
+                    </select>
+                  </div>
+                  <div className="mt-4 p-3 bg-black/40 rounded text-xs text-gray-400">
+                    <p className="font-bold mb-2">Three-Body Problem</p>
+                    <p>No general analytical solution exists. Each configuration demonstrates different aspects of gravitational chaos.</p>
+                  </div>
+                </div>
+              )}
+
+              {system === 'mandelbrot' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm mb-2 text-gray-300">
+                      Zoom: <span className="text-purple-400">{mandelbrotParams.zoom.toFixed(1)}x</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="100"
+                      step="0.1"
+                      value={mandelbrotParams.zoom}
+                      onChange={(e) => {
+                        setMandelbrotParams({ ...mandelbrotParams, zoom: parseFloat(e.target.value) });
+                        stopAnimation();
+                        setIsAnimating(false);
+                        setTimeout(() => setIsAnimating(true), 100);
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-2 text-gray-300">
+                      Max Iterations: <span className="text-purple-400">{mandelbrotParams.maxIterations}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="50"
+                      max="500"
+                      step="10"
+                      value={mandelbrotParams.maxIterations}
+                      onChange={(e) => {
+                        setMandelbrotParams({ ...mandelbrotParams, maxIterations: parseInt(e.target.value) });
+                        stopAnimation();
+                        setIsAnimating(false);
+                        setTimeout(() => setIsAnimating(true), 100);
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="mt-4 p-3 bg-black/40 rounded text-xs text-gray-400">
+                    <p className="font-mono">z<sub>n+1</sub> = z<sub>n</sub>² + c</p>
+                    <p className="mt-2">Infinite complexity at every scale. Try increasing zoom and iterations!</p>
                   </div>
                 </div>
               )}
@@ -489,6 +1223,7 @@ export default function PlaygroundPage() {
                       value={caParams.rule}
                       onChange={(e) => {
                         setCaParams({ ...caParams, rule: parseInt(e.target.value) });
+                        stopAnimation();
                         setIsAnimating(false);
                         setTimeout(() => setIsAnimating(true), 100);
                       }}
@@ -507,6 +1242,7 @@ export default function PlaygroundPage() {
                       value={caParams.cellSize}
                       onChange={(e) => {
                         setCaParams({ ...caParams, cellSize: parseInt(e.target.value) });
+                        stopAnimation();
                         setIsAnimating(false);
                         setTimeout(() => setIsAnimating(true), 100);
                       }}
